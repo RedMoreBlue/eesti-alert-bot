@@ -1,0 +1,20 @@
+[Unit]
+Description=Estonian emergency alert relay to Discord (Harju maakond)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=alertbot
+# systemd creates /var/lib/eesti-alert-bot owned by alertbot; state.json lives there,
+# so the code folder in /opt can stay root-owned and untouched by git pulls.
+StateDirectory=eesti-alert-bot
+Environment=STATE_FILE=/var/lib/eesti-alert-bot/state.json
+WorkingDirectory=/opt/eesti-alert-bot
+EnvironmentFile=/etc/eesti-alert-bot.env
+ExecStart=/usr/bin/python3 /opt/eesti-alert-bot/alert_bot.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
