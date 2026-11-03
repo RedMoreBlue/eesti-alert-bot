@@ -48,7 +48,14 @@ load_env_file()
 
 API_URL = "https://api.app.eesti.ee/api/sitrep/v1/full-events"
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
-POLL_SECONDS = int(os.environ.get("POLL_SECONDS", "20"))
+# How often to ask the API. This is the public backend of the Eesti äpp, not an
+# API made for us, so be gentle: 5 minutes by default, never faster than 1 minute.
+DEFAULT_POLL_SECONDS = 300
+MIN_POLL_SECONDS = 60
+POLL_SECONDS = max(MIN_POLL_SECONDS, int(os.environ.get("POLL_SECONDS", DEFAULT_POLL_SECONDS)))
+# After a failed check, wait twice as long each time, up to this. Back to
+# POLL_SECONDS after the next success, so a temporary block doesn't become a ban.
+MAX_BACKOFF_SECONDS = 3600
 STATE_FILE = os.environ.get("STATE_FILE", "state.json")
 USER_AGENT = "eesti-alert-discord-relay/2.0"
 
@@ -371,24 +378,32 @@ def run():
     if not WEBHOOK_URL:
         sys.exit("DISCORD_WEBHOOK_URL is not set")
 
-    seen_ids, recent_texts = load_state()
-    if seen_ids is None:
-        # First start: remember everything already in the API without posting,
-        # otherwise we'd spam the channel with months-old alerts.
-        seen_ids = {a.get("id") for _, a in fetch_alerts()}
-        save_state(seen_ids, recent_texts)
-        log(f"First run: marked {len(seen_ids)} existing alerts as already seen")
+    if os.environ.get("POLL_SECONDS") and int(os.environ["POLL_SECONDS"]) < MIN_POLL_SECONDS:
+        log(f"POLL_SECONDS={os.environ['POLL_SECONDS']} is too fast, using {MIN_POLL_SECONDS}s")
 
+    seen_ids, recent_texts = load_state()
     configured = sum(1 for r in ROLE_IDS.values() if r)
     log(f"Watching for alerts every {POLL_SECONDS}s "
         f"({configured}/{len(COUNTIES)} county roles, all role {'set' if ROLE_ALL else 'not set'})")
+    failures = 0
     while True:
         try:
-            check_once(seen_ids, recent_texts)
+            if seen_ids is None:
+                # First start: remember everything already in the API without posting,
+                # otherwise we'd spam the channel with months-old alerts.
+                seen_ids = {a.get("id") for _, a in fetch_alerts()}
+                log(f"First run: marked {len(seen_ids)} existing alerts as already seen")
+            else:
+                check_once(seen_ids, recent_texts)
             save_state(seen_ids, recent_texts)
-        except Exception as e:  # network blips etc. - log and try again next round
+            failures = 0
+        except Exception as e:  # network blips, blocks etc. - wait longer each time
+            failures += 1
             log(f"Error: {e}")
-        time.sleep(POLL_SECONDS)
+        delay = POLL_SECONDS if failures == 0 else min(POLL_SECONDS * 2 ** failures, MAX_BACKOFF_SECONDS)
+        if failures:
+            log(f"{failures} failed check(s) in a row, next try in {delay}s")
+        time.sleep(delay)
 
 
 def dry_run():

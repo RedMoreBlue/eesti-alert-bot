@@ -1,7 +1,21 @@
 # Eesti alert → Discord relay (MADE WITH AI!!!! BECAUSE IM LAZY ASFFFFFFFFFFF)
 
-Polls the eesti.ee alert API every 20 seconds and posts every new alert to a
+Polls the eesti.ee alert API every 5 minutes and posts every new alert to a
 Discord channel, pinging a role for each affected county plus an "all counties" role.
+
+> [!WARNING]
+> **Be gentle with the API.** This is the backend of the official Eesti äpp,
+> not an API published for third parties. It has no documentation and no
+> published rate limits, and it sits behind Cloudflare. A Discord relay is a
+> backup channel: people already get the official SMS and app push.
+>
+> - The bot checks **every 5 minutes** by default (`POLL_SECONDS=300`).
+> - You can make it check more often, but it **never goes below 60 seconds**,
+>   whatever you set. Please don't patch that out.
+> - After a failed check it waits longer each time (up to 1 hour), and systemd
+>   waits a minute before restarting after a crash, so a block or outage
+>   doesn't turn into a flood of retries.
+> - Running several copies of this bot multiplies the load. Run one.
 
 ## How it works
 

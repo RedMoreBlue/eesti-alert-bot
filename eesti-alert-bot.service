@@ -1,5 +1,5 @@
 [Unit]
-Description=Estonian emergency alert relay to Discord (Harju maakond)
+Description=Estonian emergency alert relay to Discord
 Wants=network-online.target
 After=network-online.target
 
@@ -14,7 +14,8 @@ WorkingDirectory=/opt/eesti-alert-bot
 EnvironmentFile=/etc/eesti-alert-bot.env
 ExecStart=/usr/bin/python3 /opt/eesti-alert-bot/alert_bot.py
 Restart=always
-RestartSec=10
+# Wait a minute before restarting after a crash, so a crash loop can't hammer the API.
+RestartSec=60
 
 [Install]
 WantedBy=multi-user.target
