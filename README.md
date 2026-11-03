@@ -28,6 +28,18 @@ Polls the eesti.ee alert API every 20 seconds and posts any new alert covering
 Discord → your server → channel settings (gear) → **Integrations** → **Webhooks**
 → **New Webhook** → name it, set a picture, pick the channel → **Copy Webhook URL**.
 
+### Optional: ping an opt-in role
+
+To also ping a role like `@ohuteavitus`, put its **ID** (not its name) in
+`PING_ROLE_ID` in the config file:
+
+1. Discord → User Settings → **Advanced** → turn on **Developer Mode**.
+2. Server Settings → **Roles** → right-click the role → **Copy Role ID**.
+3. In the role's settings, turn on **Allow anyone to @mention this role**,
+   otherwise the webhook may not be allowed to ping it.
+
+Set `PING_EVERYONE=false` if you want only the role to be pinged.
+
 ## 2. Install in a Debian LXC (Proxmox)
 
 Debian 12, unprivileged, 1 core / 512–1024 MB RAM / 4 GB disk. Inside the container, as root:
@@ -60,6 +72,8 @@ The script reads `/etc/eesti-alert-bot.env` itself, so run these as root (the fi
 python3 /opt/eesti-alert-bot/alert_bot.py --test-alert
 python3 /opt/eesti-alert-bot/alert_bot.py --test-alert --ping   # also pings @everyone
 ```
+
+The test always pings the `PING_ROLE_ID` role if one is set; `@everyone` only with `--ping`.
 
 Fetches the API, takes the newest alert sent by Kaitsevägi or Päästeamet (any region),
 and posts it exactly like a real alert, but titled **🧪 MANUAL TEST**. It doesn't touch

@@ -10,7 +10,8 @@ Usage:
     python3 alert_bot.py --dry-run           # print which current alerts match Harju, post nothing
     python3 alert_bot.py --test              # post a short "connected" message to the webhook
     python3 alert_bot.py --test-alert        # re-post the newest Kaitsevägi/Päästeamet alert, marked as a test
-    python3 alert_bot.py --test-alert --ping # same, but with @everyone
+                                             # (pings the PING_ROLE_ID role if set)
+    python3 alert_bot.py --test-alert --ping # same, plus @everyone
 """
 
 import json
@@ -44,6 +45,10 @@ WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
 POLL_SECONDS = int(os.environ.get("POLL_SECONDS", "20"))
 STATE_FILE = os.environ.get("STATE_FILE", "state.json")
 USER_AGENT = "eesti-alert-discord-relay/1.0"
+# Optional opt-in role to ping (its numeric ID, not its name), and whether real
+# alerts also ping @everyone.
+PING_ROLE_ID = os.environ.get("PING_ROLE_ID", "").strip()
+PING_EVERYONE = os.environ.get("PING_EVERYONE", "true").strip().lower() in ("1", "true", "yes")
 
 # The county we care about. App notifications list counties by EHAK code/name.
 COUNTY_CODE = "MK00000037"
@@ -150,6 +155,19 @@ def fingerprint(text):
     return re.sub(r"[^0-9a-zõäöüšž]", "", text.lower())
 
 
+def mentions(everyone):
+    """The ping text, plus the allowed_mentions that tells Discord to actually
+    ping it. Without allowed_mentions the text shows up but nobody is notified."""
+    parts, allowed = [], {"parse": []}
+    if everyone:
+        parts.append("@everyone")
+        allowed["parse"].append("everyone")
+    if PING_ROLE_ID:
+        parts.append(f"<@&{PING_ROLE_ID}>")  # Discord's syntax for a role mention
+        allowed["roles"] = [PING_ROLE_ID]
+    return " ".join(parts), allowed
+
+
 def build_message(event, alert):
     et = text_in(alert, "ET")
     en = text_in(alert, "EN")
@@ -158,10 +176,10 @@ def build_message(event, alert):
         description += f"\n\n🇬🇧 {en}"
 
     kind = "App notification" if alert.get("type") == "NOTIFICATION" else "SMS / cell broadcast"
+    pings, allowed = mentions(PING_EVERYONE)
     return {
-        "content": "@everyone",
-        # Without this, Discord would show "@everyone" as text but not ping anyone.
-        "allowed_mentions": {"parse": ["everyone"]},
+        "content": pings,
+        "allowed_mentions": allowed,
         "embeds": [{
             "title": f"⚠️ Ohuteade – {COUNTY_NAME}",
             "description": description[:4000],
@@ -304,11 +322,10 @@ def test_alert():
     event, alert = newest
     message = build_message(event, alert)
     message["embeds"][0]["title"] = "🧪 MANUAL TEST – " + message["embeds"][0]["title"]
-    if "--ping" in sys.argv:
-        message["content"] = "@everyone **MANUAL TEST** – not a real alert"
-    else:
-        message["content"] = "**MANUAL TEST** – not a real alert"
-        message["allowed_mentions"] = {"parse": []}
+    # The opt-in role is always pinged; @everyone only with --ping.
+    pings, allowed = mentions("--ping" in sys.argv)
+    message["content"] = f"{pings} **MANUAL TEST** – not a real alert".strip()
+    message["allowed_mentions"] = allowed
 
     post_to_discord(message)
     print(f"Sent alert #{alert.get('id')} from {alert.get('startDate')} as a manual test.")
