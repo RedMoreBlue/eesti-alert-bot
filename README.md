@@ -3,11 +3,17 @@
 Polls the eesti.ee alert API every 5 minutes and posts every new alert to a
 Discord channel, pinging a role for each affected county plus an "all counties" role.
 
+> [!NOTE]
+> **Unofficial hobby project.** Not made by, affiliated with or endorsed by RIA,
+> the Eesti äpp or any government agency. It has no special access: it reads
+> the same public, login-free alert list that the Eesti äpp downloads on every
+> phone, and only reads it, nothing more.
+
 > [!WARNING]
-> **Be gentle with the API.** This is the backend of the official Eesti äpp,
-> not an API published for third parties. It has no documentation and no
-> published rate limits, and it sits behind Cloudflare. A Discord relay is a
-> backup channel: people already get the official SMS and app push.
+> **Be gentle with the API.** That address is meant for the Eesti äpp, not
+> published for third parties. It has no documentation and no published rate
+> limits, and it sits behind Cloudflare. A Discord relay is a backup channel:
+> people already get the official SMS and app push.
 >
 > - The bot checks **every 5 minutes** by default (`POLL_SECONDS=300`).
 > - You can make it check more often, but it **never goes below 60 seconds**,
