@@ -1,4 +1,4 @@
-# Eesti alert → Discord relay
+# Eesti alert → Discord relay (MADE WITH AI!!!! BECAUSE IM LAZY ASFFFFFFFFFFF)
 
 Polls the eesti.ee alert API every 20 seconds and posts any new alert covering
 **Harju maakond** to a Discord channel with an `@everyone` ping.
