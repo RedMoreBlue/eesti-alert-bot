@@ -6,9 +6,11 @@ Harju maakond to a Discord channel via a webhook.
 Uses only the Python standard library, so there is nothing to pip install.
 
 Usage:
-    python3 alert_bot.py              # run forever (what systemd does)
-    python3 alert_bot.py --dry-run    # print which current alerts match Harju, post nothing
-    python3 alert_bot.py --test       # post a test message to the webhook
+    python3 alert_bot.py                     # run forever (what systemd does)
+    python3 alert_bot.py --dry-run           # print which current alerts match Harju, post nothing
+    python3 alert_bot.py --test              # post a short "connected" message to the webhook
+    python3 alert_bot.py --test-alert        # re-post the newest Kaitsevägi/Päästeamet alert, marked as a test
+    python3 alert_bot.py --test-alert --ping # same, but with @everyone
 """
 
 import json
@@ -18,7 +20,24 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime
+
+
+def load_env_file(path="/etc/eesti-alert-bot.env"):
+    """Read KEY=value lines from the config file, so manual runs don't need
+    the variables exported first. Variables already set (e.g. by systemd) win."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, _, value = line.partition("=")
+                    os.environ.setdefault(key.strip(), value.strip())
+    except OSError:
+        pass  # missing or not readable: rely on the environment
+
+
+load_env_file()
 
 API_URL = "https://api.app.eesti.ee/api/sitrep/v1/full-events"
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
@@ -262,6 +281,42 @@ def test_post():
     print("Sent.")
 
 
+# Messages from these senders count as "real" alerts for --test-alert.
+TEST_ALERT_SENDERS = ("Kaitsevägi", "Päästeamet", "Estonian Defence Forces", "Rescue Board")
+
+
+def test_alert():
+    """Re-post the newest Kaitsevägi/Päästeamet alert from the API, marked as a
+    manual test. Goes through the same message building and posting as a real
+    alert, but ignores the region filter and the seen/duplicate state."""
+    if not WEBHOOK_URL:
+        sys.exit("DISCORD_WEBHOOK_URL is not set")
+
+    newest = None
+    for event, alert in fetch_alerts():
+        text = text_in(alert, "ET") or text_in(alert, "EN")
+        if text.startswith(TEST_ALERT_SENDERS):
+            if newest is None or (alert.get("startDate") or "") > (newest[1].get("startDate") or ""):
+                newest = (event, alert)
+    if newest is None:
+        sys.exit("No Kaitsevägi or Päästeamet alert found in the API right now")
+
+    event, alert = newest
+    message = build_message(event, alert)
+    message["embeds"][0]["title"] = "🧪 MANUAL TEST – " + message["embeds"][0]["title"]
+    if "--ping" in sys.argv:
+        message["content"] = "@everyone **MANUAL TEST** – not a real alert"
+    else:
+        message["content"] = "**MANUAL TEST** – not a real alert"
+        message["allowed_mentions"] = {"parse": []}
+
+    post_to_discord(message)
+    print(f"Sent alert #{alert.get('id')} from {alert.get('startDate')} as a manual test.")
+
+
 if __name__ == "__main__":
+    commands = {"": run, "--dry-run": dry_run, "--test": test_post, "--test-alert": test_alert}
     arg = sys.argv[1] if len(sys.argv) > 1 else ""
-    {"--dry-run": dry_run, "--test": test_post}.get(arg, run)()
+    if arg not in commands:
+        sys.exit(__doc__)  # unknown option: show usage instead of starting the bot
+    commands[arg]()

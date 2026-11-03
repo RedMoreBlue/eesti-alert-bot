@@ -49,9 +49,21 @@ Its memory (`state.json`) lives in `/var/lib/eesti-alert-bot`, which systemd cre
 ```bash
 cd /opt/eesti-alert-bot
 python3 alert_bot.py --dry-run     # lists current alerts that match Harju; posts nothing
-set -a; . /etc/eesti-alert-bot.env; set +a
 python3 alert_bot.py --test        # sends a "connected" message to Discord
 ```
+
+The script reads `/etc/eesti-alert-bot.env` itself, so run these as root (the file is root-only).
+
+## Manual test with a real alert
+
+```bash
+python3 /opt/eesti-alert-bot/alert_bot.py --test-alert
+python3 /opt/eesti-alert-bot/alert_bot.py --test-alert --ping   # also pings @everyone
+```
+
+Fetches the API, takes the newest alert sent by Kaitsevägi or Päästeamet (any region),
+and posts it exactly like a real alert, but titled **🧪 MANUAL TEST**. It doesn't touch
+the running service or its memory, so the real alert can still be posted when it arrives.
 
 ## 4. Run it as a service
 
