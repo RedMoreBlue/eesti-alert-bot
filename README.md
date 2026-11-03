@@ -17,6 +17,8 @@ Discord channel, pinging a role for each affected county plus an "all counties" 
    - If an alert has no area data at all (some "threat over" SMS), the bot reads
      county names from the text instead ("Tartu, Jõgeva … maakonnas").
 3. **Ping.** The `ROLE_ALL` role plus the role of each affected county.
+   All-clear messages ("õhuoht … lõppenud", "Häire lõpp") are posted as a green
+   **✅ Ohu lõpp** instead of the red **⚠️ Ohuteade**, with the same pings.
 4. **Remember what was posted.** Every alert has a numeric `id`. Handled ids go
    into `state.json`, so a restart doesn't repost anything. On the very first
    start, everything already in the API is marked as seen without posting.

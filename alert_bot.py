@@ -256,6 +256,17 @@ def roles_for(county_keys):
     return [ROLE_ALL] + [ROLE_IDS[key] for key in county_keys]
 
 
+# Wording that means the threat is over ("õhuoht ... lõppenud", "Häire lõpp",
+# "ohtu Eesti õhuruumis ei ole"). Checked on the Estonian text with "ö" -> "õ".
+# "Ohtu pole" is deliberately not here: siren test notices use it.
+ALL_CLEAR_PATTERNS = [r"lõppenud", r"häire lõpp", r"\bohtu\b.{0,40}\bei ole"]
+
+
+def is_all_clear(alert):
+    text = text_in(alert, "ET").lower().replace("ö", "õ")
+    return any(re.search(p, text) for p in ALL_CLEAR_PATTERNS)
+
+
 def build_message(event, alert):
     et = text_in(alert, "ET")
     en = text_in(alert, "EN")
@@ -266,13 +277,14 @@ def build_message(event, alert):
     counties = affected_counties(alert)
     kind = "App notification" if alert.get("type") == "NOTIFICATION" else "SMS / cell broadcast"
     pings, allowed = mentions(roles_for(counties))
+    title, color = ("✅ Ohu lõpp", 0x16A34A) if is_all_clear(alert) else ("⚠️ Ohuteade", 0xE02424)
     return {
         "content": pings,
         "allowed_mentions": allowed,
         "embeds": [{
-            "title": "⚠️ Ohuteade",
+            "title": title,
             "description": description[:4000],
-            "color": 0xE02424,
+            "color": color,
             "fields": [
                 {"name": "Piirkond / Area", "value": area_text(counties)[:1000]},
                 {"name": "Sündmus / Event", "value": (event.get("title") or "–")[:1000]},
